@@ -13,6 +13,10 @@ import argparse
 import cv2
 
 import open3d.visualization.gui as gui
+
+import sys
+sys.path.append("/home/user/iSDF")
+sys.path.append("/home/user/iSDF/ros_utils")
 from isdf.visualisation import isdf_window
 from isdf.modules import trainer
 
@@ -64,6 +68,11 @@ def optim_iter(trainer, t):
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if device == "cuda":
+        print("cuda is available")
+    else:
+        print("cuda isn't available")
 
     seed = 1
     np.random.seed(seed)
