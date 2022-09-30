@@ -12,11 +12,9 @@ from datetime import datetime
 import argparse
 import cv2
 
-import open3d.visualization.gui as gui
-
 import sys
-sys.path.append("/home/user/iSDF")
-sys.path.append("/home/user/iSDF/ros_utils")
+sys.path.append("/home/user/ros1_ws/src/iSDF")
+import open3d.visualization.gui as gui
 from isdf.visualisation import isdf_window
 from isdf.modules import trainer
 
@@ -69,10 +67,11 @@ def optim_iter(trainer, t):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if device == "cuda":
-        print("cuda is available")
+    if torch.cuda.is_available():
+        print("torch cuda available")
     else:
-        print("cuda isn't available")
+        print("torch cuda is not available")
+
 
     seed = 1
     np.random.seed(seed)
