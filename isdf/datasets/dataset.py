@@ -1,4 +1,7 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+
+# Edits for standard ROS1 wrapper by GRAB Lab, Yale University
+
+# Original copyright (c) Meta Platforms, Inc. and affiliates.
 
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
@@ -7,7 +10,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 import cv2
-import os
+import os, sys
 # import pika
 from scipy.spatial.transform import Rotation as R
 
@@ -104,6 +107,59 @@ class ScanNetDataset(Dataset):
         rgb_file = self.rgb_dir + str(idx) + self.col_ext
 
         depth = cv2.imread(depth_file, -1)
+        image = cv2.imread(rgb_file)
+
+        T = None
+        if self.Ts is not None:
+            T = self.Ts[idx]
+
+        sample = {"image": image, "depth": depth, "T": T}
+
+        if self.rgb_transform:
+            sample["image"] = self.rgb_transform(sample["image"])
+
+        if self.depth_transform:
+            sample["depth"] = self.depth_transform(sample["depth"])
+
+        return sample
+
+# class for franka tabletop data with realsense + calibrated end-effector poses 
+class RealsenseFrankaOffline(Dataset):
+    def __init__(
+        self,
+        root_dir,
+        traj_file,
+        rgb_transform=None,
+        depth_transform=None,
+        col_ext=None,
+        noisy_depth=None,
+        distortion_coeffs=None,
+        camera_matrix=None,
+    ):
+        abspath = os.path.abspath(sys.argv[0])
+        dname = os.path.dirname(abspath)
+        os.chdir(dname)
+        self.root_dir = root_dir
+        self.rgb_dir = os.path.join(root_dir, "rgb")
+        self.depth_dir = os.path.join(root_dir, "depth")
+        if traj_file is not None:
+            self.Ts = np.loadtxt(traj_file)
+            self.Ts = self.Ts[:, 1:].reshape(-1, 4, 4)
+        self.rgb_transform = rgb_transform
+        self.depth_transform = depth_transform
+        self.col_ext = col_ext
+
+    def __len__(self):
+        return self.Ts.shape[0]
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        depth_file = os.path.join(self.depth_dir, str(idx).zfill(5) + ".npy")
+        rgb_file = os.path.join(self.rgb_dir, str(idx).zfill(5) + self.col_ext)
+
+        depth = np.load(depth_file)
         image = cv2.imread(rgb_file)
 
         T = None
@@ -222,6 +278,7 @@ class ROSSubscriber(Dataset):
     def __init__(
         self,
         dataset_format=None,
+        extrinsic_calib=None,
         root_dir=None,
         traj_file=None,
         keep_ixs=None,
@@ -241,6 +298,17 @@ class ROSSubscriber(Dataset):
 
         torch.multiprocessing.set_start_method('spawn', force=True)
         self.queue = torch.multiprocessing.Queue(maxsize=1)
+
+        if extrinsic_calib is not None:
+            process = torch.multiprocessing.Process(
+                target=node.iSDFFrankaNode,
+                args=(self.queue, crop, extrinsic_calib),
+            ) # subscribe to franka poses
+        else:
+            process = torch.multiprocessing.Process(
+                target=node.iSDFNode,
+                args=(self.queue, crop),
+            ) # subscribe to ORB-SLAM backend
 
         process = torch.multiprocessing.Process(
             target=node.iSDFNode,
