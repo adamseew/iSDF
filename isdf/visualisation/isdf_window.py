@@ -1,18 +1,19 @@
+
+import open3d.visualization.rendering as rendering
+import open3d.visualization.gui as gui
+import matplotlib.pylab as plt
+import open3d.core as o3c
+import skimage.measure
+import open3d as o3d
 import numpy as np
 import threading
-import time
 import imgviz
+import time
 import cv2
-import skimage.measure
-import matplotlib.pylab as plt
 
-import open3d as o3d
-import open3d.core as o3c
-import open3d.visualization.gui as gui
-import open3d.visualization.rendering as rendering
-
-from isdf import geometry
+from datetime import date, datetime
 from isdf.datasets import sdf_util
+from isdf import geometry
 
 
 def set_enabled(widget, enable):
@@ -160,9 +161,15 @@ class iSDFWindow:
 
         pc_label = gui.Label('Depth point cloud')
         self.pc_box = gui.Checkbox('')
-        self.pc_box.checked = False
+        self.pc_box.checked = True
         self.vis_prop_grid.add_child(pc_label)
         self.vis_prop_grid.add_child(self.pc_box)
+
+        storepc_label = gui.Label('Store point cloud')
+        self.storepc_box = gui.Checkbox('')
+        self.storepc_box.checked = True
+        self.vis_prop_grid.add_child(storepc_label)
+        self.vis_prop_grid.add_child(self.storepc_box)
 
         self.gt_mesh = None
         if self.trainer.gt_scene:
@@ -303,6 +310,8 @@ class iSDFWindow:
         self.optim_times = []
         self.prepend_text = ""
         self.latest_mesh = None
+        self.raw_pcd = None
+        self.raw_pcd_hash = 0
         self.latest_pcd = None
         self.latest_frustums = []
         self.T_WC_latest = None
@@ -630,6 +639,10 @@ class iSDFWindow:
                     self.compute_depth_pcd()
                     pcd = self.latest_pcd
 
+                # store point cloud for planning
+                if self.storepc_box.checked:
+                    self.store_pcd()
+
                 # keyframes
                 if self.kf_box.checked:
                     self.update_kf_frustums()
@@ -665,6 +678,9 @@ class iSDFWindow:
                     if self.latest_pcd is None:
                         self.compute_depth_pcd()
                     pcd = self.latest_pcd
+
+                if self.storepc_box.checked:
+                    self.store_pcd()
 
                 if self.kf_box.checked:
                     kf_frustums = self.latest_frustums
@@ -757,6 +773,7 @@ class iSDFWindow:
         pcs_cam = geometry.transform.backproject_pointclouds(
             self.trainer.gt_depth_vis, self.trainer.fx_vis, self.trainer.fy_vis,
             self.trainer.cx_vis, self.trainer.cy_vis)
+        self.raw_pcd = pcs_cam
         pcs_cam = np.einsum('Bij,Bkj->Bki', T_WC_batch[:, :3, :3], pcs_cam)
         pcs_world = pcs_cam + T_WC_batch[:, None, :3, 3]
         pcs_world = pcs_world.reshape(-1, 3).astype(np.float32)
@@ -770,7 +787,22 @@ class iSDFWindow:
         pcd = o3d.t.geometry.PointCloud(o3c.Tensor(pcs_world))
         pcd.point['colors'] = o3c.Tensor(cols)
         self.latest_pcd = pcd
+        
+    def store_pcd(self):
+        if self.raw_pcd is None:
+            self.raw_pcd = geometry.transform.backproject_pointclouds(
+                self.trainer.gt_depth_vis, self.trainer.fx_vis, self.trainer.fy_vis,
+                self.trainer.cx_vis, self.trainer.cy_vis)
 
+        _raw_pcd_hash = hash(self.raw_pcd.data.tobytes())
+        if self.raw_pcd_hash != _raw_pcd_hash:
+            file_pcd = 'isdf_pcd_' + str(datetime.timestamp(datetime.now())).replace('.', '-') + '.dat'
+            self.raw_pcd.tofile(file_pcd)
+            self.raw_pcd_hash = _raw_pcd_hash
+            print('point cloud stored to ', file_pcd)
+        else:
+            print('debug point 1')
+        
     def update_kf_frustums(self):
         kf_frustums = []
         T_WC_batch = self.trainer.frames.T_WC_batch_np
