@@ -8,6 +8,7 @@ import open3d as o3d
 import numpy as np
 import threading
 import imgviz
+import json
 import time
 import cv2
 
@@ -312,6 +313,7 @@ class iSDFWindow:
         self.latest_mesh = None
         self.raw_pcd = None
         self.raw_pcd_hash = 0
+        self.pcd_last_stored = 0 
         self.latest_pcd = None
         self.latest_frustums = []
         self.T_WC_latest = None
@@ -796,12 +798,16 @@ class iSDFWindow:
 
         _raw_pcd_hash = hash(self.raw_pcd.data.tobytes())
         if self.raw_pcd_hash != _raw_pcd_hash:
-            file_pcd = 'isdf_pcd_' + str(datetime.timestamp(datetime.now())).replace('.', '-') + '.dat'
-            self.raw_pcd.tofile(file_pcd)
+            self.pcd_last_stored = datetime.timestamp(datetime.now())
+            file_pcd = 'isdf_pcd_' + str(self.pcd_last_stored).replace('.', '-') + '.dat'
+            self.raw_pcd.tofile(file_pcd, sep=',', format='%s')
             self.raw_pcd_hash = _raw_pcd_hash
             print('point cloud stored to ', file_pcd)
-        else:
-            print('debug point 1')
+
+        if __debug__:
+            self.raw_pcd.tofile('debug_pcd_current.dat', sep=',', format='%s')
+            with open('debug_pcd_data.json', 'w') as file:
+                file.write(json.dumps({'pcd_last_callback': str(datetime.timestamp(datetime.now())), 'pcd_last_stored': str(self.pcd_last_stored)}))
         
     def update_kf_frustums(self):
         kf_frustums = []
