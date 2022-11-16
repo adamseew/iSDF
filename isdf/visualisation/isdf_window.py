@@ -312,6 +312,7 @@ class iSDFWindow:
         self.prepend_text = ""
         self.latest_mesh = None
         self.raw_pcd = None
+        self.raw_pcd_color = None
         self.raw_pcd_hash = 0
         self.pcd_last_stored = 0 
         self.latest_pcd = None
@@ -781,6 +782,7 @@ class iSDFWindow:
         pcs_world = pcs_world.reshape(-1, 3).astype(np.float32)
         cols = self.trainer.gt_im_vis.reshape(-1, 3)
         cols = cols.astype(np.float32) / 255
+        self.raw_pcd_color = cols
         if len(pcs_world) > self.max_points:
             ixs = np.random.choice(
                 np.arange(len(pcs_world)), self.max_points, replace=False)
@@ -806,6 +808,8 @@ class iSDFWindow:
 
         if __debug__:
             self.raw_pcd.tofile('debug_pcd_current.dat', sep=',', format='%s')
+            if self.raw_pcd_color is not None:
+                self.raw_pcd_color.tofile('debug_pcd_current_color.dat', ',', '%s')
             with open('debug_pcd_data.json', 'w') as file:
                 file.write(json.dumps({'pcd_last_callback': str(datetime.timestamp(datetime.now())), 'pcd_last_stored': str(self.pcd_last_stored)}))
         
