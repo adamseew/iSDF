@@ -4,10 +4,12 @@
 # LICENSE file in the root directory of this source tree.
 
 import numpy as np
-import typing
-from scipy import interpolate
 import trimesh
+import typing
 import torch
+
+from datetime import date, datetime
+from scipy import interpolate
 
 
 def ray_dirs_C(B, H, W, fx, fy, cx, cy, device, depth_type='z'):
@@ -163,6 +165,10 @@ def pointcloud_from_depth(
     if depth_type == "euclidean":
         norm = np.linalg.norm(pc, axis=2)
         pc = pc * (z / norm)[:, :, None]
+    
+    if __debug__:
+        pc.tofile('locale_pcd_' + str(datetime.timestamp(datetime.now())).replace('.', '-') + '.dat', sep=',', format='%s')
+
     return pc
 
 

@@ -793,25 +793,27 @@ class iSDFWindow:
         self.latest_pcd = pcd
         
     def store_pcd(self):
-        if self.raw_pcd is None:
-            self.raw_pcd = geometry.transform.backproject_pointclouds(
-                self.trainer.gt_depth_vis, self.trainer.fx_vis, self.trainer.fy_vis,
-                self.trainer.cx_vis, self.trainer.cy_vis)
+        
+        if __debug__:            
+            if self.raw_pcd is None:
+                self.raw_pcd = geometry.transform.backproject_pointclouds(
+                   self.trainer.gt_depth_vis, self.trainer.fx_vis, self.trainer.fy_vis,
+                   self.trainer.cx_vis, self.trainer.cy_vis)
 
-        _raw_pcd_hash = hash(self.raw_pcd.data.tobytes())
-        if self.raw_pcd_hash != _raw_pcd_hash:
-            self.pcd_last_stored = datetime.timestamp(datetime.now())
-            file_pcd = 'isdf_pcd_' + str(self.pcd_last_stored).replace('.', '-') + '.dat'
-            self.raw_pcd.tofile(file_pcd, sep=',', format='%s')
-            self.raw_pcd_hash = _raw_pcd_hash
-            print('point cloud stored to ', file_pcd)
+            _raw_pcd_hash = hash(self.raw_pcd.data.tobytes())
+            if self.raw_pcd_hash != _raw_pcd_hash:
+                self.raw_pcd_hash = _raw_pcd_hash
+                print('change in pcd detected')
+                
+                self.pcd_last_stored = datetime.timestamp(datetime.now())
+                str_pcd_last_stored = str(self.pcd_last_stored).replace('.', '-')
+                file_pcd = 'isdf_pcd_' + str_pcd_last_stored + '.dat'
+                file_pcd_color = 'isdf_pcd_color_' + str_pcd_last_stored + '.dat'
+                self.raw_pcd.tofile(file_pcd, sep=',', format='%s')
+                self.raw_pcd_color.tofile(file_pcd_color, sep=',', format='%s')
 
-        if __debug__:
-            self.raw_pcd.tofile('debug_pcd_current.dat', sep=',', format='%s')
-            if self.raw_pcd_color is not None:
-                self.raw_pcd_color.tofile('debug_pcd_current_color.dat', ',', '%s')
-            with open('debug_pcd_data.json', 'w') as file:
-                file.write(json.dumps({'pcd_last_callback': str(datetime.timestamp(datetime.now())), 'pcd_last_stored': str(self.pcd_last_stored)}))
+            # with open('debug_isdf_data.json', 'w') as file:
+            #    file.write(json.dumps({'last_callback': str(datetime.timestamp(datetime.now())), 'last_stored': str(self.pcd_last_stored)}))
         
     def update_kf_frustums(self):
         kf_frustums = []
